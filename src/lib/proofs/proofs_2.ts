@@ -1,7 +1,7 @@
 import { defineProof, point, segment } from "./builders";
 import type { Proof } from "./types";
 
-export const PROOFS: Proof[] = [
+export const proofs2: Proof[] = [
   defineProof({
     id: "ii-1",
     label: "II.1",
@@ -62,6 +62,3 @@ export const PROOFS: Proof[] = [
     ],
   }),
 ];
-
-export const getProof = (id: string): Proof | undefined =>
-  PROOFS.find((proof) => proof.id === id);

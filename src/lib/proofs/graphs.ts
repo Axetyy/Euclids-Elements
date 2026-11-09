@@ -5,7 +5,11 @@ export interface LayoutIssue {
   message: string;
 }
 export interface GraphLayout {
-  nodes: Array<{ id: string; x: number; y: number }>;
+  nodes: Array<{
+    id: string;
+    x: number;
+    y: number;
+  }>;
   edges: Array<{ id: string; source: string; target: string }>;
   issues: LayoutIssue[];
 }
@@ -44,85 +48,92 @@ export function validateProofs(proofs: Proof[]): LayoutIssue[] {
   return issues;
 }
 
-const COL_W = 190;
+const COL_W = 230;
 const ROW_H = 190;
-const SIDE_ROW_H = 190;
-const SIDE_GAP = 280;
 
 export function buildLayout(proofs: Proof[]): GraphLayout {
   const issues = validateProofs(proofs);
   const byId = new Map(proofs.map((p) => [p.id, p]));
 
+  // Depth = row. Roots (no dependencies) are depth 0.
   const depth = new Map<string, number>();
-  const theoremDepth = (id: string, path = new Set<string>()): number => {
+  const proofDepth = (id: string, path = new Set<string>()): number => {
     if (depth.has(id)) return depth.get(id)!;
     if (path.has(id)) return 0;
-    const next = (byId.get(id)?.dependencies ?? []).filter(
-      (d) => byId.get(d)?.kind === "theorem",
-    );
+    const next = (byId.get(id)?.dependencies ?? []).filter((d) => byId.has(d));
     const nextPath = new Set(path).add(id);
     const value = next.length
-      ? 1 + Math.max(...next.map((d) => theoremDepth(d, nextPath)))
+      ? 1 + Math.max(...next.map((d) => proofDepth(d, nextPath)))
       : 0;
     depth.set(id, value);
     return value;
   };
 
-  const rows = new Map<number, Proof[]>();
-  const left: Proof[] = [];
-  const right: Proof[] = [];
-  const addRow = (row: number, p: Proof) =>
-    rows.set(row, [...(rows.get(row) ?? []), p]);
-
+  // Pick one primary parent per proof (its deepest dependency) so the
+  // dependency DAG becomes a spanning forest. Other dependencies are still
+  // drawn as edges, but don't affect positioning.
+  const parentOf = new Map<string, string>();
+  const children = new Map<string, Proof[]>();
   for (const p of proofs) {
-    if (p.kind === "postulate") addRow(0, p);
-    else if (p.kind === "theorem") addRow(1 + theoremDepth(p.id), p);
-    else if (p.kind === "common-notion") left.push(p);
-    else right.push(p);
+    const valid = p.dependencies.filter((d) => byId.has(d) && d !== p.id);
+    if (!valid.length) continue;
+    const parent = valid.reduce((best, d) =>
+      proofDepth(d) > proofDepth(best) ? d : best,
+    );
+    parentOf.set(p.id, parent);
+    children.set(parent, [...(children.get(parent) ?? []), p]);
   }
 
-  const nodes: GraphLayout["nodes"] = [];
-  let maxCount = 1;
-  rows.forEach((row) => {
-    maxCount = Math.max(maxCount, row.length);
-  });
-  const halfWidth = ((maxCount - 1) * COL_W) / 2;
-  const rowCount = rows.size ? Math.max(...rows.keys()) + 1 : 1;
-  const centralHeight = (rowCount - 1) * ROW_H;
+  // Tidy tree: leaves take consecutive slots, parents are centered over
+  // their children.
+  const xById = new Map<string, number>();
+  const placed = new Set<string>();
+  let nextLeaf = 0;
 
-  rows.forEach((row, r) => {
-    row.forEach((p, i) => {
-      nodes.push({
-        id: p.id,
-        x: (i - (row.length - 1) / 2) * COL_W,
-        y: r * ROW_H,
-      });
-    });
-  });
-
-  const placeColumn = (items: Proof[], x: number) => {
-    const colHeight = (items.length - 1) * SIDE_ROW_H;
-    const startY = Math.max(0, (centralHeight - colHeight) / 2);
-    items.forEach((p, i) =>
-      nodes.push({ id: p.id, x, y: startY + i * SIDE_ROW_H }),
-    );
+  const place = (proof: Proof): number => {
+    placed.add(proof.id);
+    const childXs: number[] = [];
+    for (const child of children.get(proof.id) ?? []) {
+      if (!placed.has(child.id)) childXs.push(place(child));
+    }
+    const x = childXs.length
+      ? (childXs[0] + childXs[childXs.length - 1]) / 2
+      : nextLeaf++ * COL_W;
+    xById.set(proof.id, x);
+    return x;
   };
-  const sideX = halfWidth + SIDE_GAP;
-  placeColumn(left, -sideX);
-  placeColumn(right, sideX);
+
+  // Real roots first, then anything left over (e.g. nodes stuck in a cycle).
+  proofs
+    .filter((p) => !parentOf.has(p.id))
+    .forEach((p) => {
+      if (!placed.has(p.id)) place(p);
+    });
+  proofs.forEach((p) => {
+    if (!placed.has(p.id)) place(p);
+  });
+
+  // Center the whole forest around x = 0.
+  const xs = [...xById.values()];
+  const offset = xs.length ? -(Math.min(...xs) + Math.max(...xs)) / 2 : 0;
+
+  const nodes: GraphLayout["nodes"] = proofs.map((p) => ({
+    id: p.id,
+    x: (xById.get(p.id) ?? 0) + offset,
+    y: proofDepth(p.id) * ROW_H,
+  }));
 
   const edges = proofs.flatMap((p) =>
     p.dependencies
       .filter((d) => byId.has(d))
       .map((d) => ({
         id: `${p.id}->${d}`,
-        source: p.id,
-        target: d,
+        source: d,
+        target: p.id,
       })),
   );
   return { nodes, edges, issues };
 }
-
 export function collectRelated(
   proofs: Proof[],
   id: string,

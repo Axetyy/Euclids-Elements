@@ -3,7 +3,6 @@ import ReactFlow, {
   Controls,
   Handle,
   MarkerType,
-  MiniMap,
   Panel,
   Position,
   type Edge,
@@ -26,7 +25,7 @@ interface NodeData {
   role: Role;
   animated: boolean;
 }
-const NODE_W = 160;
+const NODE_W = 190;
 const ROLE_RING: Record<Role, string> = {
   selected: "#ffffff",
   dependency: "#fbbf24",
@@ -36,7 +35,7 @@ const ROLE_RING: Record<Role, string> = {
 };
 
 const ProofNode = memo(function ProofNode({ data }: NodeProps<NodeData>) {
-  const color = KIND_STYLE[data.kind]?.color ?? "info.main";
+  const color = KIND_STYLE[data.kind!]?.color ?? "info.main";
   return (
     <Box
       title={data.title}
@@ -47,7 +46,7 @@ const ProofNode = memo(function ProofNode({ data }: NodeProps<NodeData>) {
         borderRadius: 2,
         background: "#111a33",
         border: `2px solid ${color}`,
-        boxShadow: `0 0 0 3px ${ROLE_RING[data.role]}`,
+        boxShadow: `0 0 0 3px ${ROLE_RING[data.role!]}`,
         color: "common.white",
         textAlign: "center",
         cursor: "pointer",
@@ -55,7 +54,7 @@ const ProofNode = memo(function ProofNode({ data }: NodeProps<NodeData>) {
     >
       <Handle
         type="source"
-        position={Position.Top}
+        position={Position.Bottom}
         style={{ opacity: 0 }}
         isConnectable={false}
       />
@@ -76,7 +75,7 @@ const ProofNode = memo(function ProofNode({ data }: NodeProps<NodeData>) {
       </Typography>
       <Handle
         type="target"
-        position={Position.Bottom}
+        position={Position.Top}
         style={{ opacity: 0 }}
         isConnectable={false}
       />
@@ -116,7 +115,7 @@ export const ProofTree: React.FC<ProofTreeProps> = ({
     [proofs, selectedId],
   );
   const nodes: Node<NodeData>[] = useMemo(() => {
-    return layout.nodes.flatMap((n) => {
+    return layout.nodes.flatMap((n): Node<NodeData>[] => {
       const p = byId.get(n.id);
       if (!p) return [];
       let role: Role = "idle";
@@ -138,7 +137,10 @@ export const ProofTree: React.FC<ProofTreeProps> = ({
             role,
             animated: p.steps.length > 0 || !!p.custom,
           },
-          draggable: true,
+          draggable: false,
+          zIndex: 1,
+          sourcePosition: Position.Bottom,
+          targetPosition: Position.Top,
         },
       ];
     });
@@ -160,6 +162,7 @@ export const ProofTree: React.FC<ProofTreeProps> = ({
           id: e.id,
           source: e.source,
           target: e.target,
+          type: "smoothstep",
           animated: isDep || isDependent,
           style: {
             stroke,
@@ -194,9 +197,9 @@ export const ProofTree: React.FC<ProofTreeProps> = ({
             sx={{
               bgcolor: "surface.overlay",
               color: "text.secondary",
-              p: 0,
               borderRadius: 1,
               fontSize: 11,
+              p: 1.25,
             }}
           >
             <Typography variant="h6" sx={{ mb: 0.5 }}>
