@@ -156,18 +156,22 @@ export const ProofTree: React.FC<ProofTreeProps> = ({
         const isDep = !!upSet && upSet.has(e.source) && upSet.has(e.target);
         const isDependent =
           !!downSet && downSet.has(e.source) && downSet.has(e.target);
+        const highlighted = isDep || isDependent;
+        const primary: boolean = e.primary;
         const stroke = isDep ? "#fbbf24" : isDependent ? "#22d3ee" : "#475569";
-        const dimmed = !!selectedId && !isDep && !isDependent;
+        const dimmed = !!selectedId && !highlighted;
         return {
           id: e.id,
           source: e.source,
           target: e.target,
-          type: "smoothstep",
-          animated: isDep || isDependent,
+          type: primary ? "smoothstep" : "default",
+          animated: highlighted,
+          zIndex: highlighted ? 2 : primary ? 0 : -1,
           style: {
             stroke,
-            strokeWidth: isDep || isDependent ? 2.5 : 1.2,
-            opacity: dimmed ? 0.75 : 1,
+            strokeWidth: highlighted ? 2.5 : primary ? 1.5 : 1,
+            strokeDasharray: primary || highlighted ? undefined : "5 5",
+            opacity: highlighted ? 1 : dimmed ? 0.65 : primary ? 1 : 0.35,
           },
           markerEnd: { type: MarkerType.ArrowClosed, color: stroke },
         };
@@ -228,9 +232,7 @@ export const ProofTree: React.FC<ProofTreeProps> = ({
                 </Stack>
               ))}
             </Stack>
-            <Typography variant="body1" sx={{ display: "block", mt: 0.5 }}>
-              ▶ = has animation · arrows point to what a proof uses
-            </Typography>
+
             {selectedId && (
               <Typography variant="body1" sx={{ display: "block", mt: 0.5 }}>
                 <Box component="span" sx={{ color: "graph.dependency" }}>
