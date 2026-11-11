@@ -24,13 +24,6 @@ export const Section: React.FC<SectionProps> = ({
         return {
           backgroundColor: "primary.light",
         };
-      case SectionVariant.SnakeSkin:
-        return {
-          backgroundImage:
-            "linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)), url(/textures/snake-skin-texture.png)",
-          backgroundColor: "primary.light",
-          backgroundRepeat: "repeat",
-        };
       case SectionVariant.Inherit:
         return {
           backgroundColor: "transparent",

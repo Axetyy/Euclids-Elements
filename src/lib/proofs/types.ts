@@ -52,7 +52,7 @@ export interface LineCircleIntersectionPrimitive {
 export interface PolygonPrimitive {
   type: "polygon";
   id: string;
-  points: string[];
+  points: (string | Vec2)[];
   color?: string;
 }
 export type Primitive =

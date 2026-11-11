@@ -3,8 +3,15 @@
 import { Box, Stack, Typography } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { getBookProofs, getBookProof } from "@/lib/proofs/books";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  getBookGraphProofs,
+  getBookProof,
+  getProof,
+  getProofBook,
+} from "@/lib/proofs/books";
 import { ProofDetails } from "@/components/organism/ProofDetails/ProofDetails";
+import { pageRoutes } from "@/utils/routes";
 
 const ProofTree = dynamic(
   () =>
@@ -33,14 +40,19 @@ interface BookExplorerProps {
 }
 
 export const BookExplorer: React.FC<BookExplorerProps> = ({ bookNumber }) => {
-  const proofs = getBookProofs(bookNumber);
-  const [selectedId, setSelectedId] = useState<string | null>(
-    proofs[0]?.id ?? null,
-  );
+  const proofs = getBookGraphProofs(bookNumber);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedProofId = searchParams.get("proof");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
-    setSelectedId(proofs[0]?.id ?? null);
-  }, [bookNumber, proofs]);
+    setSelectedId(
+      requestedProofId && getBookProof(bookNumber, requestedProofId)
+        ? requestedProofId
+        : null,
+    );
+  }, [bookNumber, requestedProofId]);
 
   const select = useCallback(
     (id: string | null) => {
@@ -49,12 +61,23 @@ export const BookExplorer: React.FC<BookExplorerProps> = ({ bookNumber }) => {
         return;
       }
 
-      if (getBookProof(bookNumber, id)) setSelectedId(id);
+      const targetBook = getProofBook(id);
+      if (targetBook === undefined) return;
+      if (targetBook !== bookNumber) {
+        router.push(
+          `${pageRoutes.book(targetBook)}?proof=${encodeURIComponent(id)}`,
+        );
+        return;
+      }
+
+      setSelectedId((current) => (current === id ? null : id));
     },
-    [bookNumber],
+    [bookNumber, router],
   );
 
-  const proof = selectedId ? getBookProof(bookNumber, selectedId) : null;
+  const proof = selectedId
+    ? getBookProof(bookNumber, selectedId) ?? getProof(selectedId) ?? null
+    : null;
 
   return (
     <Box
@@ -90,7 +113,7 @@ export const BookExplorer: React.FC<BookExplorerProps> = ({ bookNumber }) => {
           <ProofDetails
             proof={proof}
             onSelect={select}
-            resolveProof={(id) => getBookProof(bookNumber, id)}
+            resolveProof={getProof}
           />
         </Box>
       )}

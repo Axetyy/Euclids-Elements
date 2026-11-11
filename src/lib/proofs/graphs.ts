@@ -54,24 +54,23 @@ export function validateProofs(proofs: Proof[]): LayoutIssue[] {
   return issues;
 }
 
-/** Horizontal distance between node centers on the same row (NODE_W is 190). */
+/** Horizontal distance between node centers on the same row. */
 const COL_W = 450;
+
 /** Vertical distance between proposition layers. */
 const ROW_H = 450;
+
 /** Vertical distance between rows inside the definitions / notions shelf. */
 const SHELF_ROW_H = 100;
+
 /** Max nodes per row in the shelf grids. */
 const SHELF_COLS = 10;
+
 /** Extra vertical breathing room between bands. */
 const BAND_GAP = 150;
 
 type Bucket = "definition" | "notion" | "postulate" | "proposition";
 
-/**
- * Classify by `kind`. Matching is by substring so it works with names like
- * "definition", "common-notion", "postulate", "proposition"/"theorem"/etc.
- * Adjust here if your ProofKind values differ.
- */
 function bucketOf(p: Proof): Bucket {
   const k = String(p.kind).toLowerCase();
   if (k.includes("def")) return "definition";
@@ -83,14 +82,13 @@ function bucketOf(p: Proof): Bucket {
 
 const rowX = (i: number, n: number) => (i - (n - 1) / 2) * COL_W;
 
-export function buildLayout(proofs: Proof[]): GraphLayout {
+export const buildLayout = (proofs: Proof[]): GraphLayout => {
   const issues = validateProofs(proofs);
   const byId = new Map(proofs.map((p) => [p.id, p]));
   const bucket = new Map(proofs.map((p) => [p.id, bucketOf(p)]));
   const of = (b: Bucket) => proofs.filter((p) => bucket.get(p.id) === b);
   const pos = new Map<string, { x: number; y: number }>();
 
-  /** Wrapped, centered grid. Returns the height it used. */
   const placeGrid = (list: Proof[], top: number): number => {
     if (!list.length) return 0;
     const cols = Math.min(SHELF_COLS, list.length);
@@ -104,17 +102,14 @@ export function buildLayout(proofs: Proof[]): GraphLayout {
     return (rows - 1) * SHELF_ROW_H + BAND_GAP + SHELF_ROW_H * 0.5;
   };
 
-  // ── Bands 1–3: definitions, common notions, postulates ────────────────
   let y = 0;
   y += placeGrid(of("definition"), y);
   y += placeGrid(of("notion"), y);
   y += placeGrid(of("postulate"), y);
 
-  // ── Band 4: propositions, at most 2^n per layer n ─────────────────────
   const props = of("proposition");
   const propIds = new Set(props.map((p) => p.id));
 
-  // Longest-path depth among propositions only (decides who goes first).
   const depth = new Map<string, number>();
   const depthOf = (id: string, path = new Set<string>()): number => {
     const cached = depth.get(id);
@@ -131,9 +126,6 @@ export function buildLayout(proofs: Proof[]): GraphLayout {
     return v;
   };
 
-  // Greedy layering: a proposition must sit strictly below every proposition
-  // it depends on; if its layer is already full (2^n), it drops to the next.
-  // Pushing down never breaks a dependency, so order is always valid.
   const order = props
     .map((p, i) => ({ p, i, d: depthOf(p.id) }))
     .sort((a, b) => a.d - b.d || a.i - b.i);
@@ -150,8 +142,6 @@ export function buildLayout(proofs: Proof[]): GraphLayout {
     layerOf.set(p.id, layer);
   }
 
-  // Order each layer by the average x of what it depends on (barycenter),
-  // then space evenly. Fixed spacing >= COL_W means nodes can never overlap.
   const xOf = new Map<string, number>();
   const anchorX = (d: string): number | undefined => {
     const b = bucket.get(d);
@@ -183,8 +173,6 @@ export function buildLayout(proofs: Proof[]): GraphLayout {
     y: pos.get(p.id)?.y ?? 0,
   }));
 
-  // Primary edge per proof: the closest proposition above it, otherwise a
-  // postulate. Definitions / notions are never primary.
   const primaryOf = new Map<string, string>();
   for (const p of proofs) {
     const valid = [...new Set(p.dependencies)].filter(
@@ -216,7 +204,7 @@ export function buildLayout(proofs: Proof[]): GraphLayout {
       })),
   );
   return { nodes, edges, issues };
-}
+};
 
 export function collectRelated(
   proofs: Proof[],

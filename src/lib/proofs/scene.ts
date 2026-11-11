@@ -151,7 +151,9 @@ export function resolveScene(steps: ProofStep[], step: number): ResolvedScene {
         step: primitiveStep,
       });
     } else if (primitive.type === "polygon") {
-      const polygonPoints = primitive.points.map(pointFor);
+      const polygonPoints = primitive.points.map((point) =>
+        typeof point === "string" ? pointFor(point) : point,
+      );
       if (polygonPoints.every((p): p is Vec2 => !!p))
         scene.polygons.push({
           id: primitive.id,
